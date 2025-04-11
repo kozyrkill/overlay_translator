@@ -5,6 +5,7 @@ echo "[1/4] Проверка и установка системных пакет
 
 declare -a DEPS=(
   "tesseract-ocr"
+  "imagemagick"
   "xdotool"
   "x11-utils"
   "scrot"
