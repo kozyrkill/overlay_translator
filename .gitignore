@@ -1,4 +1,52 @@
+# Виртуальное окружение
+venv/
+env/
+ENV/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Временные файлы
+*.tmp
+*.temp
+/tmp/
+*.png
+*.jpg
+*.jpeg
+
+# Кэш
 cache/
-.venv/
+*.sqlite
+*.db
+
+# Логи
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Системные файлы
+.DS_Store
+Thumbs.db

@@ -232,8 +232,6 @@ class TranslatorApp(Gtk.Window):
             self.status_label.set_text(f"Неожиданная ошибка: {e}")
 
     def on_manual_update(self, button):
-        # Принудительно очищаем кэш при ручном обновлении
-        self.ocr_engine.clear_cache()
         thread = threading.Thread(target=self.perform_translation, daemon=True)
         thread.start()
 
@@ -251,50 +249,40 @@ class TranslatorApp(Gtk.Window):
                 GLib.idle_add(self.status_label.set_text, "Ошибка захвата окна")
                 return
             
-            # Проверяем, изменилось ли изображение (порог 5% изменений)
-            cached_translated_blocks = self.ocr_engine.get_cached_translated_blocks()
+            # Распознаем текст
+            text = self.ocr_engine.recognize_text()
+            if not text:
+                GLib.idle_add(self.status_label.set_text, "Текст не распознан")
+                return
+                
+            GLib.idle_add(self.status_label.set_text, "Текст распознан, перевод...")
             
-            if cached_translated_blocks:
-                # Используем кэшированные переводы
-                print("[DEBUG] Используем кэшированные переводы")
-                translated_blocks = cached_translated_blocks
-                text_blocks = self.ocr_engine.last_ocr_result
-                GLib.idle_add(self.status_label.set_text, f"Используем кэш: {len(translated_blocks)} блоков")
-            else:
-                # Распознаем текст с координатами
-                text_blocks = self.ocr_engine.recognize_text_with_positions()
-                if not text_blocks:
-                    GLib.idle_add(self.status_label.set_text, "Текст не распознан")
-                    return
-                    
-                GLib.idle_add(self.status_label.set_text, f"Распознано {len(text_blocks)} блоков, перевод...")
-                
-                # Переводим каждый текстовый блок
-                translator = self.translator_combo.get_active_text()
-                translated_blocks = self.translation_engine.translate_text_blocks(text_blocks, translator)
-                
-                if not translated_blocks:
-                    GLib.idle_add(self.status_label.set_text, "Ошибка перевода")
-                    return
-                
-                # Кэшируем результат
-                self.ocr_engine.cache_translated_blocks(translated_blocks)
-                
-                # Обновляем статус
-                short_text = f"Переведено {len(translated_blocks)} блоков"
-                GLib.idle_add(self.status_label.set_text, short_text)
-                
-                # Обновляем буферы только в расширенном режиме
-                if not self.compact_mode:
-                    # Показываем оригинальный текст
-                    original_text = '\n'.join([block['text'] for block in text_blocks])
-                    translated_text = '\n'.join([block.get('translated_text', '') for block in translated_blocks])
-                    GLib.idle_add(self.ocr_buffer.set_text, original_text)
-                    GLib.idle_add(self.translation_buffer.set_text, translated_text)
+            # Разбиваем текст на предложения для лучшего перевода
+            sentences = self.translation_engine.split_into_sentences(text)
+            print(f"[DEBUG] OCR распознал {len(sentences)} предложений")
             
-            # Показываем множественные overlay (в любом случае)
+            # Переводим каждое предложение отдельно
+            translated_parts = []
+            for i, sentence in enumerate(sentences):
+                if sentence.strip():
+                    translator = self.translator_combo.get_active_text()
+                    translated_part = self.translation_engine.translate_text(sentence.strip(), translator)
+                    translated_parts.append(translated_part)
+                    print(f"[DEBUG] Предложение {i+1}: '{sentence}' -> '{translated_part}'")
+            
+            # Объединяем переводы
+            translated = '\n'.join(translated_parts)
+            short_text = translated[:60] + ("..." if len(translated) > 60 else "")
+            GLib.idle_add(self.status_label.set_text, "Перевод: " + short_text)
+            
+            # Обновляем буферы только в расширенном режиме
+            if not self.compact_mode:
+                GLib.idle_add(self.ocr_buffer.set_text, text)
+                GLib.idle_add(self.translation_buffer.set_text, translated)
+            
+            # Показываем overlay
             x, y, w, h = self.ocr_engine.get_window_geometry(self.window_id)
-            GLib.idle_add(self.overlay_manager.show_multiple_overlays, translated_blocks, x, y, self.compact_mode)
+            GLib.idle_add(self.overlay_manager.show_overlay, translated, x, y, w, h, self.compact_mode)
             
             # Очищаем временные файлы
             self.ocr_engine.cleanup()
