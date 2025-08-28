@@ -76,6 +76,15 @@ class TranslatorApp(Gtk.Window):
         self.clear_cache_btn.connect("clicked", self.on_clear_cache)
         self.clear_cache_btn.set_size_request(320, 35)
 
+        # Кнопки управления overlay для скриншотов
+        self.hide_overlay_btn = Gtk.Button(label="Скрыть overlay")
+        self.hide_overlay_btn.connect("clicked", self.on_hide_overlay)
+        self.hide_overlay_btn.set_size_request(150, 35)
+        
+        self.show_overlay_btn = Gtk.Button(label="Показать overlay")
+        self.show_overlay_btn.connect("clicked", self.on_show_overlay)
+        self.show_overlay_btn.set_size_request(150, 35)
+
         # Переключатель режимов
         self.compact_checkbox = Gtk.CheckButton(label="Компактный вид")
         self.compact_checkbox.connect("toggled", self.on_toggle_compact_mode)
@@ -152,18 +161,28 @@ class TranslatorApp(Gtk.Window):
         # Кнопка очистки кэша
         grid.attach(self.clear_cache_btn, 0, 6, 2, 1)
 
+        # Кнопки управления overlay
+        grid.attach(self.hide_overlay_btn, 0, 7, 1, 1)
+        grid.attach(self.show_overlay_btn, 1, 7, 1, 1)
+        
+        # Кнопка автоматического скриншота
+        self.screenshot_btn = Gtk.Button(label="Скриншот без overlay")
+        self.screenshot_btn.connect("clicked", self.on_screenshot)
+        self.screenshot_btn.set_size_request(320, 35)
+        grid.attach(self.screenshot_btn, 0, 8, 2, 1)
+
         # Информация об окне
-        grid.attach(self.window_label, 0, 7, 2, 1)
-        grid.attach(self.status_label, 0, 8, 2, 1)
+        grid.attach(self.window_label, 0, 9, 2, 1)
+        grid.attach(self.status_label, 0, 10, 2, 1)
 
         # Элементы расширенного режима
         ocr_label = Gtk.Label(label="Распознанный текст:")
-        grid.attach(ocr_label, 0, 9, 2, 1)
-        grid.attach(self.ocr_scroll, 0, 10, 2, 1)
+        grid.attach(ocr_label, 0, 11, 2, 1)
+        grid.attach(self.ocr_scroll, 0, 12, 2, 1)
 
         translation_label = Gtk.Label(label="Перевод:")
-        grid.attach(translation_label, 0, 11, 2, 1)
-        grid.attach(self.translation_scroll, 0, 12, 2, 1)
+        grid.attach(translation_label, 0, 13, 2, 1)
+        grid.attach(self.translation_scroll, 0, 14, 2, 1)
 
         self.add(grid)
 
@@ -181,6 +200,9 @@ class TranslatorApp(Gtk.Window):
 
         # Показываем все элементы
         self.show_all()
+        
+        # Инициализируем состояние кнопок overlay
+        self.show_overlay_btn.set_sensitive(False)  # Изначально overlay видны
 
     def on_toggle_compact_mode(self, checkbox):
         """Обработчик переключения компактного режима"""
@@ -306,6 +328,41 @@ class TranslatorApp(Gtk.Window):
     def on_clear_cache(self, button):
         self.translation_engine.clear_cache()
         self.status_label.set_text("Кэш очищен")
+
+    def on_hide_overlay(self, button):
+        """Скрывает overlay окна для создания скриншота"""
+        self.overlay_manager.hide_for_screenshot()
+        self.status_label.set_text("Overlay скрыты для скриншота")
+        self.hide_overlay_btn.set_sensitive(False)
+        self.show_overlay_btn.set_sensitive(True)
+
+    def on_show_overlay(self, button):
+        """Восстанавливает overlay окна после создания скриншота"""
+        self.overlay_manager.restore_after_screenshot()
+        self.status_label.set_text("Overlay восстановлены")
+        self.hide_overlay_btn.set_sensitive(True)
+        self.show_overlay_btn.set_sensitive(False)
+
+    def on_screenshot(self, button):
+        """Создает скриншот без overlay надписей"""
+        self.status_label.set_text("Создание скриншота без overlay...")
+        
+        # Скрываем overlay с автоматическим восстановлением через 5 секунд
+        self.overlay_manager.hide_for_screenshot_with_delay(5)
+        
+        # Временно блокируем кнопку
+        self.screenshot_btn.set_sensitive(False)
+        
+        # Восстанавливаем кнопку через 6 секунд
+        GLib.timeout_add_seconds(6, self._restore_screenshot_button)
+        
+        print("Overlay скрыты для создания скриншота. Восстановятся через 5 секунд.")
+
+    def _restore_screenshot_button(self):
+        """Восстанавливает кнопку скриншота"""
+        self.screenshot_btn.set_sensitive(True)
+        self.status_label.set_text("Overlay восстановлены")
+        return False  # Не повторяем таймер
 
     def on_start(self, button):
         self.translation_enabled = True

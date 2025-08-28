@@ -13,6 +13,8 @@ class OverlayManager:
     def __init__(self):
         self.overlay_windows = []  # Список всех overlay окон
         self.overlay_opacity = 0.8
+        self._hidden_overlays = []  # Список временно скрытых overlay для восстановления
+        self._is_hidden = False  # Флаг состояния скрытия
     
     def set_opacity(self, opacity):
         """Устанавливает прозрачность overlay"""
@@ -306,3 +308,51 @@ class OverlayManager:
     def destroy(self):
         """Уничтожает overlay окно"""
         self.hide_overlay()
+    
+    def hide_for_screenshot(self):
+        """Временно скрывает все overlay окна для создания скриншота"""
+        if self._is_hidden:
+            return  # Уже скрыты
+            
+        self._hidden_overlays = self.overlay_windows.copy()
+        self.hide_all_overlays()
+        self._is_hidden = True
+        print("[DEBUG] Overlay временно скрыты для скриншота")
+    
+    def hide_for_screenshot_with_delay(self, delay_seconds=3):
+        """Скрывает overlay с автоматическим восстановлением через указанное время"""
+        if self._is_hidden:
+            return  # Уже скрыты
+            
+        self.hide_for_screenshot()
+        
+        # Автоматически восстанавливаем через указанное время
+        GLib.timeout_add_seconds(delay_seconds, self._auto_restore_after_screenshot)
+        print(f"[DEBUG] Overlay будут автоматически восстановлены через {delay_seconds} секунд")
+    
+    def _auto_restore_after_screenshot(self):
+        """Автоматическое восстановление overlay после скриншота"""
+        self.restore_after_screenshot()
+        return False  # Не повторяем таймер
+    
+    def restore_after_screenshot(self):
+        """Восстанавливает все overlay окна после создания скриншота"""
+        if not self._is_hidden:
+            return  # Не были скрыты
+            
+        # Восстанавливаем все скрытые overlay
+        for overlay in self._hidden_overlays:
+            try:
+                if overlay and not overlay.is_destroyed():
+                    overlay.show_all()
+                    self.overlay_windows.append(overlay)
+            except:
+                pass  # Игнорируем ошибки
+        
+        self._hidden_overlays.clear()
+        self._is_hidden = False
+        print(f"[DEBUG] Восстановлено {len(self.overlay_windows)} overlay окон")
+    
+    def is_hidden_for_screenshot(self):
+        """Проверяет, скрыты ли overlay для скриншота"""
+        return self._is_hidden
