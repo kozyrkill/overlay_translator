@@ -15,6 +15,7 @@ class OverlayManager:
         self.overlay_opacity = 0.8
         self._hidden_overlays = []  # Список временно скрытых overlay для восстановления
         self._is_hidden = False  # Флаг состояния скрытия
+        self._screenshot_invisible = False  # Флаг невидимости для скриншотов
     
     def set_opacity(self, opacity):
         """Устанавливает прозрачность overlay"""
@@ -25,6 +26,44 @@ class OverlayManager:
                 overlay.set_opacity(self.overlay_opacity)
             except:
                 pass  # Игнорируем deprecated warning
+    
+    def set_screenshot_invisible(self, invisible=True):
+        """Настраивает overlay так, чтобы они были невидимы для программ захвата экрана"""
+        self._screenshot_invisible = invisible
+        
+        for overlay in self.overlay_windows:
+            try:
+                if invisible:
+                    # Делаем окно невидимым для программ захвата экрана
+                    overlay.set_skip_taskbar_hint(True)
+                    overlay.set_skip_pager_hint(True)
+                    # Устанавливаем специальный тип окна
+                    overlay.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+                    # Делаем окно "невидимым" для скриншотов
+                    overlay.set_accept_focus(False)
+                    overlay.set_focus_on_map(False)
+                    # Устанавливаем специальные атрибуты окна
+                    overlay.set_keep_below(False)
+                    overlay.set_keep_above(True)
+                else:
+                    # Возвращаем нормальное поведение
+                    overlay.set_skip_taskbar_hint(False)
+                    overlay.set_skip_pager_hint(False)
+                    overlay.set_type_hint(Gdk.WindowTypeHint.NORMAL)
+                    overlay.set_accept_focus(True)
+                    overlay.set_focus_on_map(True)
+                    overlay.set_keep_below(False)
+                    overlay.set_keep_above(True)
+            except Exception as e:
+                print(f"[DEBUG] Ошибка настройки невидимости: {e}")
+        
+        status = "включена" if invisible else "отключена"
+        print(f"[DEBUG] Невидимость для скриншотов {status}")
+    
+    def toggle_screenshot_invisibility(self):
+        """Переключает режим невидимости для скриншотов"""
+        self.set_screenshot_invisible(not self._screenshot_invisible)
+        return self._screenshot_invisible
     
     def show_overlay(self, text, x, y, w, h, compact_mode=True):
         """Показывает overlay окно с переведенным текстом (устаревший метод)"""
@@ -153,6 +192,16 @@ class OverlayManager:
             overlay.set_keep_above(True)
             overlay.set_accept_focus(False)
             
+            # Применяем настройки невидимости для скриншотов
+            if self._screenshot_invisible:
+                try:
+                    overlay.set_skip_taskbar_hint(True)
+                    overlay.set_skip_pager_hint(True)
+                    overlay.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+                    overlay.set_focus_on_map(False)
+                except:
+                    pass
+            
             print(f"[DEBUG] Overlay позиционирован: x={overlay_x}, y={overlay_y}, размер={w + 20}x{h + 10}")
             print(f"[DEBUG] Оригинальный текст: x={x}, y={y}, размер={w}x{h}")
             print(f"[DEBUG] Позиционирование: {'под текстом' if y - h - 5 < 0 else 'над текстом'}")
@@ -206,6 +255,16 @@ class OverlayManager:
 
         # ВАЖНО: Делаем окно полностью прозрачным для событий
         self.overlay_window.set_events(Gdk.EventMask(0))
+
+        # Применяем настройки невидимости для скриншотов
+        if self._screenshot_invisible:
+            try:
+                self.overlay_window.set_skip_taskbar_hint(True)
+                self.overlay_window.set_skip_pager_hint(True)
+                self.overlay_window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+                self.overlay_window.set_focus_on_map(False)
+            except:
+                pass
 
         # Устанавливаем размер и позицию
         self.overlay_window.set_default_size(w, h)
@@ -267,6 +326,16 @@ class OverlayManager:
             
         # ВАЖНО: Делаем окно полностью прозрачным для событий
         self.overlay_window.set_events(Gdk.EventMask(0))
+
+        # Применяем настройки невидимости для скриншотов
+        if self._screenshot_invisible:
+            try:
+                self.overlay_window.set_skip_taskbar_hint(True)
+                self.overlay_window.set_skip_pager_hint(True)
+                self.overlay_window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+                self.overlay_window.set_focus_on_map(False)
+            except:
+                pass
 
         # Устанавливаем размер и позицию
         self.overlay_window.set_default_size(w, h)

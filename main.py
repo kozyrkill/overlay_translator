@@ -170,19 +170,25 @@ class TranslatorApp(Gtk.Window):
         self.screenshot_btn.connect("clicked", self.on_screenshot)
         self.screenshot_btn.set_size_request(320, 35)
         grid.attach(self.screenshot_btn, 0, 8, 2, 1)
+        
+        # Кнопка переключения невидимости для скриншотов
+        self.invisible_btn = Gtk.Button(label="Overlay невидимы для скриншотов: ВЫКЛ")
+        self.invisible_btn.connect("clicked", self.on_toggle_invisibility)
+        self.invisible_btn.set_size_request(320, 35)
+        grid.attach(self.invisible_btn, 0, 9, 2, 1)
 
         # Информация об окне
-        grid.attach(self.window_label, 0, 9, 2, 1)
-        grid.attach(self.status_label, 0, 10, 2, 1)
+        grid.attach(self.window_label, 0, 10, 2, 1)
+        grid.attach(self.status_label, 0, 11, 2, 1)
 
         # Элементы расширенного режима
         ocr_label = Gtk.Label(label="Распознанный текст:")
-        grid.attach(ocr_label, 0, 11, 2, 1)
-        grid.attach(self.ocr_scroll, 0, 12, 2, 1)
+        grid.attach(ocr_label, 0, 12, 2, 1)
+        grid.attach(self.ocr_scroll, 0, 13, 2, 1)
 
         translation_label = Gtk.Label(label="Перевод:")
-        grid.attach(translation_label, 0, 13, 2, 1)
-        grid.attach(self.translation_scroll, 0, 14, 2, 1)
+        grid.attach(translation_label, 0, 14, 2, 1)
+        grid.attach(self.translation_scroll, 0, 15, 2, 1)
 
         self.add(grid)
 
@@ -203,6 +209,10 @@ class TranslatorApp(Gtk.Window):
         
         # Инициализируем состояние кнопок overlay
         self.show_overlay_btn.set_sensitive(False)  # Изначально overlay видны
+        
+        # Изначально включаем режим невидимости для скриншотов
+        self.overlay_manager.set_screenshot_invisible(True)
+        self.invisible_btn.set_label("Overlay невидимы для скриншотов: ВКЛ")
 
     def on_toggle_compact_mode(self, checkbox):
         """Обработчик переключения компактного режима"""
@@ -363,6 +373,19 @@ class TranslatorApp(Gtk.Window):
         self.screenshot_btn.set_sensitive(True)
         self.status_label.set_text("Overlay восстановлены")
         return False  # Не повторяем таймер
+
+    def on_toggle_invisibility(self, button):
+        """Переключает режим невидимости overlay для скриншотов"""
+        is_invisible = self.overlay_manager.toggle_screenshot_invisibility()
+        
+        if is_invisible:
+            self.invisible_btn.set_label("Overlay невидимы для скриншотов: ВКЛ")
+            self.status_label.set_text("Overlay теперь невидимы для программ захвата экрана")
+            print("Режим невидимости для скриншотов ВКЛЮЧЕН")
+        else:
+            self.invisible_btn.set_label("Overlay невидимы для скриншотов: ВЫКЛ")
+            self.status_label.set_text("Overlay теперь видны для программ захвата экрана")
+            print("Режим невидимости для скриншотов ВЫКЛЮЧЕН")
 
     def on_start(self, button):
         self.translation_enabled = True
