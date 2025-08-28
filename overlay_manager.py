@@ -16,6 +16,19 @@ class OverlayManager:
         self._hidden_overlays = []  # Список временно скрытых overlay для восстановления
         self._is_hidden = False  # Флаг состояния скрытия
         self._screenshot_invisible = False  # Флаг невидимости для скриншотов
+        
+        # Проверяем, работаем ли мы в X11
+        try:
+            import os
+            self._is_x11 = os.environ.get('XDG_SESSION_TYPE', '').lower() == 'x11'
+            if not self._is_x11:
+                print("[WARNING] Невидимость для скриншотов может не работать в Wayland")
+                print("[WARNING] Рекомендуется использовать X11 для полной функциональности")
+            else:
+                print("[INFO] X11 режим обнаружен - невидимость для скриншотов будет работать")
+        except:
+            self._is_x11 = False
+            print("[WARNING] Не удалось определить тип сессии")
     
     def set_opacity(self, opacity):
         """Устанавливает прозрачность overlay"""
@@ -34,17 +47,24 @@ class OverlayManager:
         for overlay in self.overlay_windows:
             try:
                 if invisible:
-                    # Делаем окно невидимым для программ захвата экрана
+                    # Основные свойства для невидимости на скриншотах
                     overlay.set_skip_taskbar_hint(True)
                     overlay.set_skip_pager_hint(True)
-                    # Устанавливаем специальный тип окна
+                    
+                    # Устанавливаем тип окна UTILITY - не отображается в списках окон
                     overlay.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-                    # Делаем окно "невидимым" для скриншотов
+                    
+                    # Отключаем фокус и отображение в списках
                     overlay.set_accept_focus(False)
                     overlay.set_focus_on_map(False)
+                    
                     # Устанавливаем специальные атрибуты окна
-                    overlay.set_keep_below(False)
                     overlay.set_keep_above(True)
+                    overlay.set_keep_below(False)
+                    
+                    # Устанавливаем дополнительные X11 атрибуты
+                    self._set_x11_attributes(overlay, True)
+                    
                 else:
                     # Возвращаем нормальное поведение
                     overlay.set_skip_taskbar_hint(False)
@@ -52,13 +72,28 @@ class OverlayManager:
                     overlay.set_type_hint(Gdk.WindowTypeHint.NORMAL)
                     overlay.set_accept_focus(True)
                     overlay.set_focus_on_map(True)
-                    overlay.set_keep_below(False)
                     overlay.set_keep_above(True)
+                    overlay.set_keep_below(False)
+                    
+                    # Восстанавливаем X11 атрибуты
+                    self._set_x11_attributes(overlay, False)
+                    
             except Exception as e:
                 print(f"[DEBUG] Ошибка настройки невидимости: {e}")
         
         status = "включена" if invisible else "отключена"
         print(f"[DEBUG] Невидимость для скриншотов {status}")
+        
+        # Дополнительная информация о текущих настройках
+        if self.overlay_windows:
+            try:
+                first_overlay = self.overlay_windows[0]
+                print(f"[DEBUG] Тип окна: {first_overlay.get_type_hint()}")
+                print(f"[DEBUG] Skip taskbar: {first_overlay.get_skip_taskbar_hint()}")
+                print(f"[DEBUG] Skip pager: {first_overlay.get_skip_pager_hint()}")
+                print(f"[DEBUG] Accept focus: {first_overlay.get_accept_focus()}")
+            except Exception as e:
+                print(f"[DEBUG] Ошибка получения информации о настройках: {e}")
     
     def toggle_screenshot_invisibility(self):
         """Переключает режим невидимости для скриншотов"""
@@ -122,6 +157,49 @@ class OverlayManager:
         else:
             print("[DEBUG] Нет новых overlay для показа")
 
+    def _set_x11_attributes(self, overlay, invisible=True):
+        """Устанавливает дополнительные X11 атрибуты для невидимости на скриншотах"""
+        if not self._is_x11:
+            return
+            
+        try:
+            window = overlay.get_window()
+            if not window:
+                return
+                
+            if invisible:
+                # Устанавливаем X11 атрибуты для невидимости
+                # _NET_WM_WINDOW_TYPE = _NET_WM_WINDOW_TYPE_UTILITY
+                # _NET_WM_STATE = _NET_WM_STATE_SKIP_TASKBAR | _NET_WM_STATE_SKIP_PAGER
+                
+                # Дополнительные атрибуты GTK
+                overlay.set_can_focus(False)
+                overlay.set_decorated(False)
+                overlay.set_resizable(False)
+                overlay.set_modal(False)
+                
+                # Устанавливаем атрибуты X11 через Gdk.Window
+                window.set_skip_taskbar_hint(True)
+                window.set_skip_pager_hint(True)
+                window.set_keep_above(True)
+                
+                print(f"[DEBUG] X11 атрибуты установлены для невидимости")
+            else:
+                # Восстанавливаем нормальные атрибуты
+                overlay.set_can_focus(True)
+                overlay.set_decorated(False)  # Оставляем без рамки
+                overlay.set_resizable(False)  # Оставляем фиксированный размер
+                overlay.set_modal(False)
+                
+                window.set_skip_taskbar_hint(False)
+                window.set_skip_pager_hint(False)
+                window.set_keep_above(True)
+                
+                print(f"[DEBUG] X11 атрибуты восстановлены")
+                
+        except Exception as e:
+            print(f"[DEBUG] Ошибка установки X11 атрибутов: {e}")
+    
     def _create_positioned_overlay(self, text, x, y, w, h, compact_mode=True):
         """Создает overlay окно в указанной позиции"""
         try:
@@ -199,6 +277,9 @@ class OverlayManager:
                     overlay.set_skip_pager_hint(True)
                     overlay.set_type_hint(Gdk.WindowTypeHint.UTILITY)
                     overlay.set_focus_on_map(False)
+                    
+                    # Устанавливаем дополнительные X11 атрибуты
+                    self._set_x11_attributes(overlay, True)
                 except:
                     pass
             
